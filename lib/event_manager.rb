@@ -1,6 +1,9 @@
+# frozen_string_literal:true
+
 require 'csv'
 require 'google/apis/civicinfo_v2'
 require 'erb'
+require 'date'
 
 puts 'Event Manager Initialized!'
 
@@ -39,6 +42,20 @@ def save_thank_you_letter(id, form_letter)
   end
 end
 
+def show_registrations_by_hour(reg_hour_tally)
+  puts 'Hour | Number of registrations'
+  reg_hour_tally.tally.sort_by { |_key, value| -value}.to_h.each do |key, value|
+    puts "#{key} | #{value}"
+  end
+end
+
+def show_registrations_by_weekday(reg_day_tally)
+  puts 'Weekday | Number of registrations'
+  reg_day_tally.tally.sort_by { |key, value| -value}.to_h.each do |key, value|
+    puts "#{Date::DAYNAMES[key]} | #{value}"
+  end
+end
+
 contents = CSV.open(
   'event_attendees.csv',
   headers: true,
@@ -48,13 +65,22 @@ contents = CSV.open(
 template_letter = File.read('form_letter.erb')
 erb_template = ERB.new template_letter
 
+reg_hour_tally = []
+reg_day_tally = []
+
 contents.each do |row|
   id = row[0]
   name = row[:first_name]
   zipcode = clean_zipcode(row[:zipcode])
   phone_number = clean_number(row[:homephone])
-  #legislators = legislators_by_zipcode(zipcode)
-  #form_letter = erb_template.result(binding)
-  #save_thank_you_letter(id, form_letter)
-  puts "#{name} #{phone_number}"
+  reg_time = Time.strptime(row[:regdate], '%m/%d/%y %k:%M')
+  reg_hour_tally << reg_time.hour
+  reg_day_tally << reg_time.wday
+  legislators = legislators_by_zipcode(zipcode)
+  form_letter = erb_template.result(binding)
+  save_thank_you_letter(id, form_letter)
+  puts "#{name} #{phone_number} #{reg_time}"
 end
+
+show_registrations_by_hour(reg_hour_tally)
+show_registrations_by_weekday(reg_day_tally)
